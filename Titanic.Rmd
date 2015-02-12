@@ -1,0 +1,119 @@
+---
+title: "Titanic Data Analysis"
+author: "Yuji Shen"
+date: "February 11, 2015"
+output: html_document
+---
+
+```{r knitr.setting,echo=FALSE}
+knitr::opts_chunk$set(warning = FALSE,
+                      message = FALSE,
+                      echo = FALSE)
+```
+
+```{r library & data}
+library(ggplot2)
+library(GGally)
+library(dplyr)
+setwd('/Users/Yuji/Workspace/R/Titanic')
+train <- read.csv("train.csv")
+test<- read.csv("test.csv")
+```
+
+```{r data transform}
+train$Survived <- factor(train$Survived, level = c(0, 1), label = c("Dead", "Survived"))
+train$Pclass <- factor(train$Pclass, label = c("1st", "2nd", "3rd"))
+train$Age.Group <- cut(train$Age, breaks = seq(0, 80, 10))
+```
+
+## Age
+```{r survived age}
+ggplot(aes(x = Age), data = train) +
+  geom_histogram(aes(y = ..density..), binwidth = 1) +
+  geom_density(color = "red")
+```
+
+The distribution of Age is positive-skewed, and most people are between 18 and 38.
+
+```{r survive rate}
+survive.rate.by.age <- train %>%
+  group_by(Age) %>%
+  summarise(Survive.Rate = sum(Survived=="Survived")/n())
+ggplot(aes(x = Age, y = Survive.Rate), data = survive.rate.by.age) +
+  geom_point() +
+  geom_smooth()
+```
+
+Group the data by age, then calculate the survive rate in each age group. Plot the survive rate vs age, with a smoothing line.
+
+It is obvious that children under 10, have a more than 50% chance to survive. And for people are between 20 and 40, they only have 30% chance to survive.
+
+There is a rise for people in 40 to 60 group, and this is very interesting one. I guess this rise dues to most people in this age group are in 1st class, so they have larger chance to survive than other adults. I will explore it in next plot.
+
+```{r age class}
+class.rate.by.age <- train %>%
+  group_by(Age) %>%
+  summarise(First.Class.Rate = sum(Pclass=="1st")/n())
+
+ggplot(aes(x = Age, y = First.Class.Rate), data = class.rate.by.age) +
+  geom_point() +
+  geom_smooth()
+```
+
+It is clear that the 1st class rate is increasing as the age of people growing, especially for people older than 50, which have more than 50% 1st class rate.
+
+## Sex
+```{r survived age sex}
+ggplot(aes(x = Age, fill = Sex), data = train) +
+  geom_histogram(binwidth = 1) + 
+  facet_grid(Survived~.)
+```
+
+We seperate the survived and dead people, and filled with sex. In the dead people, most of them are male. So the female has a larger chance to survive in this disaster.
+
+```{r survived class}
+ggplot(aes(x = Pclass), data = train) +
+  geom_bar(aes(fill = Sex))
+```
+
+The sex ratio of 1st class and 2nd class are much lower than 3rd class, maybe female, at that time, have to rely on their fathers or hasband to board on 1st class.
+
+## Fare
+In order to do scatterplot, I do some analysis on the numeric variable `Fare` in the dataset.
+
+```{r fare class}
+fare_by_class <- train %>%
+  group_by(Pclass) %>%
+  summarise(Mean.Fare = mean(Fare),
+          Median.Fare = median(Fare),
+          n = n())
+
+ggplot(aes(x = Pclass, y = Mean.Fare), data = fare_by_class) +
+  geom_bar(stat = "identity")
+```
+
+First, I explore the relation with class and fare. We can see that the 1st class spend much more (4 times) than 2nd class. And there is no much difference between 2nd class and 3rd class.
+
+```{r fare age}
+ggplot(aes(x = Age, y = Fare), data = train) +
+  geom_point(aes(color = Sex)) +
+  geom_smooth(aes(x = Age, y = Fare, fill = "orange"), 
+              data = subset(train, Sex == "female")) + 
+  geom_smooth(aes(x = Age, y = Fare, fill = "steel"), 
+              data = subset(train, Sex == "male")) +
+  coord_cartesian(ylim = c(0, quantile(train$Fare, 0.95)))
+```
+
+This is an interesting plot about `Fare` and `Sex`. From the smoothing line, we can see that in general, for adult, women spend more than men. And the difference becomes larger for older people.
+
+```{r fare surivived}
+ggplot(aes(x = Age, y = Fare), data = train) +
+  geom_point(aes(color = Survived)) +
+  geom_smooth(aes(x = Age, y = Fare, fill = "steel"), 
+              data = subset(train, Survived == "Survived")) + 
+  geom_smooth(aes(x = Age, y = Fare, fill = "orange"), 
+              data = subset(train, Survived == "Dead")) +
+  coord_cartesian(ylim = c(0, quantile(train$Fare, 0.95)))
+```
+
+This graph is also very interesting. It tells us: **survived people spent more than dead people**. (They bought their living chance?! LOL) I guess this is caused by the factor of female and 1st class, which buildup most of survived people and likely to spend a lot.
